@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     // TAMBAHKAN INI di bagian bawah
     id("com.google.gms.google-services")
+    // PARCELABLE
+    id("kotlin-parcelize")
 }
 
 android {
@@ -85,4 +87,10 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
 
     implementation("androidx.core:core-ktx:1.12.0")
+
+    // CARDVIEW
+    implementation("androidx.cardview:cardview:1.0.0")
+
+    // Tambahkan ini untuk RecyclerView:
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 }

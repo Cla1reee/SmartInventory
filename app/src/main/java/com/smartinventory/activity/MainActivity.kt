@@ -7,51 +7,74 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.smartinventory.ui.theme.SmartInventoryTheme
 import android.content.Intent
-import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import com.smartinventory.R
 import com.smartinventory.viewmodel.AuthViewModel
+import android.widget.Toast
+import androidx.cardview.widget.CardView
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewModel: AuthViewModel
-    private lateinit var tvUserInfo: TextView
-    private lateinit var btnLogout: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Inisialisasi ViewModel
         viewModel = ViewModelProvider(this).get(AuthViewModel::class.java)
 
-        // 2. CEK KEAMANAN (Wajib)
-        // Jika user belum login (uid null), paksa pindah ke LoginActivity
+        // 1. Cek User Login
         if (viewModel.getCurrentUserUid() == null) {
             goToLogin()
             return
         }
 
-        // 3. Inisialisasi UI
-        tvUserInfo = findViewById(R.id.tvUserInfo)
-        btnLogout = findViewById(R.id.btnLogout)
+        // 2. Inisialisasi Komponen UI
+        val tvNamaToko = findViewById<TextView>(R.id.tvNamaToko)
+        val tvUserEmail = findViewById<TextView>(R.id.tvUserEmail)
 
-        // Tampilkan UID User sementara (bukti berhasil masuk)
-        val currentUid = viewModel.getCurrentUserUid()
-        tvUserInfo.text = "User ID: $currentUid"
+        val cardAdd = findViewById<CardView>(R.id.cardAdd)
+        val cardList = findViewById<CardView>(R.id.cardList)
+        // Ubah variabel ini sesuai ID baru di XML
+        val cardCashier = findViewById<CardView>(R.id.cardCashier)
+        val cardHistory = findViewById<CardView>(R.id.cardHistory) // ID Baru
+        val cardLogout = findViewById<CardView>(R.id.cardLogout)
 
-        // 4. Logika Tombol Logout
-        btnLogout.setOnClickListener {
-            viewModel.logout() // Kita perlu tambahkan fungsi ini di ViewModel
+        // --- 1. Tombol TAMBAH BARANG (Kembali ke fungsi asli) ---
+        cardAdd.setOnClickListener {
+            val intent = Intent(this, AddItemActivity::class.java)
+            startActivity(intent)
+        }
+
+        // --- 2. Tombol STOK BARANG ---
+        cardList.setOnClickListener {
+            val intent = Intent(this, ProductListActivity::class.java)
+            startActivity(intent)
+        }
+
+        // --- 3. Tombol KASIR (Fungsi Baru) ---
+        cardCashier.setOnClickListener {
+            val intent = Intent(this, CashierActivity::class.java)
+            startActivity(intent)
+        }
+
+        // --- 4. Tombol LOGOUT ---
+        cardLogout.setOnClickListener {
+            viewModel.logout()
+            Toast.makeText(this, "Berhasil Logout", Toast.LENGTH_SHORT).show()
             goToLogin()
+        }
+        // --- 5. Tombol LAPORAN ---
+        cardHistory.setOnClickListener {
+            val intent = Intent(this, HistoryActivity::class.java)
+            startActivity(intent)
         }
     }
 
     private fun goToLogin() {
         val intent = Intent(this, LoginActivity::class.java)
-        // Hapus history agar saat diback tidak balik ke Dashboard
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

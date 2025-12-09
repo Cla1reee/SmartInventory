@@ -25,7 +25,7 @@ class AuthRepository {
                     if (userId != null) {
                         // Simpan data tambahan ke Firestore
                         val newUser = User(
-                            uid = userId,
+                            uId = userId,
                             email = email,
                             namaToko = namaToko
                         )

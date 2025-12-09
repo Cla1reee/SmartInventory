@@ -32,6 +32,23 @@
             android:name=".activity.RegisterActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".activity.AddItemActivity"
+            android:exported="false"
+            android:label="Tambah Barang" />
+
+        <activity
+            android:name=".activity.ProductListActivity" />
+
+        <activity
+            android:name=".activity.EditItemActivity" />
+
+        <activity
+            android:name=".activity.CashierActivity" />
+
+        <activity
+            android:name=".activity.HistoryActivity" />
+
     </application>
 
 </manifest>
