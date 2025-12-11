@@ -27,7 +27,9 @@ class AuthRepository {
                         val newUser = User(
                             uId = userId,
                             email = email,
-                            namaToko = namaToko
+                            storeName = namaToko, // Perhatikan: Variabel input tetap 'namaToko', tapi dimasukkan ke 'storeName'
+                            role = "admin",       // Default sesuai SRS
+                            createdAt = java.util.Date() // Sesuai SRS
                         )
 
                         db.collection(USERS_COLLECTION)
