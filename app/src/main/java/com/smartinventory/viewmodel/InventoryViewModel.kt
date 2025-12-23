@@ -11,7 +11,6 @@ import kotlinx.coroutines.launch
 
 class InventoryViewModel : ViewModel() {
 
-    // Sebaiknya repository ini di-inject, tapi untuk sekarang ini oke.
     private val repository = InventoryRepository()
 
     // --- LIVE DATA ---
@@ -31,8 +30,7 @@ class InventoryViewModel : ViewModel() {
     private val _transactionList = MutableLiveData<List<Transaction>>()
     val transactionList: LiveData<List<Transaction>> = _transactionList
 
-    // --- HELPER: Reset Pesan Toast ---
-    // Panggil ini setelah Toast muncul di UI agar tidak muncul lagi saat rotasi layar
+    // --- HELPER ---
     fun clearToastMessage() {
         _toastMessage.value = null
     }
@@ -41,39 +39,53 @@ class InventoryViewModel : ViewModel() {
         _operationStatus.value = null
     }
 
-    // --- FUNGSI 1: JEMBATAN DARI ADD_ITEM_ACTIVITY ---
-    fun addProduct(nama: String, hargaStr: String, stokStr: String, supplier: String) {
-        resetOperationStatus() // Pastikan status bersih sebelum mulai
+    // --- FUNGSI 1: TAMBAH BARANG (DIPERBAIKI) ---
+    fun addProduct(nama: String, harga: Double, stok: Int, supplier: String) {
+        resetOperationStatus()
 
-        // 1. IMPROVEMENT: Gunakan trim() untuk menghapus spasi tidak sengaja di awal/akhir
+        // 1. Validasi Input
+        if (nama.isEmpty()) {
+            _toastMessage.value = "Nama barang wajib diisi!"
+            return
+        }
+
+        // 2. Buat Objek Product dengan Nama Field BARU (Sesuai SRS)
+        val newProduct = Product(
+            productName = nama.trim(),  // PERBAIKAN: namaBarang -> productName
+            price = harga,              // PERBAIKAN: harga -> price
+            stock = stok,               // PERBAIKAN: stok -> stock
+            supplier = supplier.trim(),
+            userId = "" // Repository yang akan mengisi userId ini secara otomatis
+        )
+
+        saveProductToRepo(newProduct)
+    }
+
+    // Overloading untuk support panggilan lama (String input) dari Activity jika perlu
+    fun addProduct(nama: String, hargaStr: String, stokStr: String, supplier: String) {
         val cleanNama = nama.trim()
         val cleanHargaStr = hargaStr.trim()
         val cleanStokStr = stokStr.trim()
 
-        // Validasi Input
         if (cleanNama.isEmpty() || cleanHargaStr.isEmpty() || cleanStokStr.isEmpty()) {
             _toastMessage.value = "Nama, Harga, dan Stok wajib diisi!"
             return
         }
 
-        // Konversi Data
         val harga = cleanHargaStr.toDoubleOrNull()
         val stok = cleanStokStr.toIntOrNull()
 
-        // Validasi Angka
         if (harga == null || stok == null) {
             _toastMessage.value = "Format harga atau stok salah (harus angka)"
             return
         }
 
-        val newProduct = Product(
-            namaBarang = cleanNama,
-            harga = harga,
-            stok = stok,
-            supplier = supplier.trim()
-        )
-
-        saveProductToRepo(newProduct)
+        if (harga < 0 || stok < 0) {
+            _toastMessage.value = "Harga dan Stok tidak boleh negatif!"
+            return
+        }
+        // Panggil fungsi utama
+        addProduct(cleanNama, harga, stok, supplier)
     }
 
     // --- FUNGSI 2: SIMPAN KE REPOSITORY ---
@@ -81,7 +93,7 @@ class InventoryViewModel : ViewModel() {
         _isLoading.value = true
 
         repository.addProduct(product) { success, error ->
-            _isLoading.postValue(false) // Gunakan postValue di dalam callback
+            _isLoading.postValue(false)
 
             if (success) {
                 _toastMessage.postValue("Barang berhasil ditambahkan!")
@@ -99,40 +111,23 @@ class InventoryViewModel : ViewModel() {
         _isLoading.value = true
         viewModelScope.launch {
             try {
-                // Panggil fungsi suspend repository
                 val result = repository.getAllProducts(query)
-
                 _productList.value = result
 
                 if (result.isEmpty() && !query.isNullOrEmpty()) {
                     _toastMessage.value = "Barang '$query' tidak ditemukan"
                 }
             } catch (e: Exception) {
-                // 2. IMPROVEMENT: Tangkap error jika terjadi crash saat ambil data
-                _toastMessage.value = "Terjadi kesalahan memuat data: ${e.message}"
+                _toastMessage.value = "Terjadi kesalahan: ${e.message}"
                 _productList.value = emptyList()
             } finally {
-                // Pastikan loading berhenti, sukses ataupun gagal
                 _isLoading.value = false
             }
         }
     }
 
-    // --- FUNGSI 4: HAPUS BARANG ---
-    fun deleteProduct(productId: String) {
-        _isLoading.value = true
-        repository.deleteProduct(productId) { success ->
-            _isLoading.postValue(false)
-            if (success) {
-                _toastMessage.postValue("Barang berhasil dihapus")
-                loadProducts()
-            } else {
-                _toastMessage.postValue("Gagal menghapus barang")
-            }
-        }
-    }
 
-    // --- FUNGSI 5: UPDATE BARANG ---
+    // --- FUNGSI 4: UPDATE BARANG ---
     fun updateProduct(productId: String, updates: Map<String, Any>) {
         _isLoading.value = true
         repository.updateProduct(productId, updates) { success ->
@@ -146,29 +141,41 @@ class InventoryViewModel : ViewModel() {
         }
     }
 
+    // --- FUNGSI 5: HAPUS BARANG ---
+    fun deleteProduct(productId: String) {
+        _isLoading.value = true
+        repository.deleteProduct(productId) { success ->
+            _isLoading.postValue(false)
+            if (success) {
+                _toastMessage.postValue("Barang berhasil dihapus")
+                loadProducts()
+            } else {
+                _toastMessage.postValue("Gagal menghapus barang")
+            }
+        }
+    }
+
     // --- FUNGSI 6: SIMPAN TRANSAKSI (KASIR) ---
     fun saveTransaction(transaction: Transaction) {
         _isLoading.value = true
         resetOperationStatus()
 
-        // KARENA REPOSITORY SUDAH 'SUSPEND', KITA PAKAI COROUTINE:
         viewModelScope.launch {
             try {
-                // 1. Panggil langsung (kode akan menunggu di sini sampai selesai)
+                // Repository sudah menghandle logika pengurangan stok
                 val isSuccess = repository.createTransaction(transaction)
 
-                _isLoading.value = false // Tidak perlu postValue karena ini Main Thread
+                _isLoading.value = false
 
                 if (isSuccess) {
                     _toastMessage.value = "Transaksi berhasil disimpan!"
                     _operationStatus.value = true
-                    loadProducts() // Update stok
+                    loadProducts() // Refresh stok di UI
                 } else {
-                    _toastMessage.value = "Gagal menyimpan transaksi (Cek Logcat)."
+                    _toastMessage.value = "Gagal menyimpan transaksi (Stok habis/Error)."
                     _operationStatus.value = false
                 }
             } catch (e: Exception) {
-                // Jaga-jaga jika ada error tak terduga
                 _isLoading.value = false
                 _toastMessage.value = "Error: ${e.message}"
                 _operationStatus.value = false
@@ -183,11 +190,6 @@ class InventoryViewModel : ViewModel() {
             try {
                 val result = repository.getAllTransactions()
                 _transactionList.value = result
-
-                if (result.isEmpty()) {
-                    // Optional: Jangan tampilkan toast kalau cuma kosong (biar tidak mengganggu)
-                    // _toastMessage.value = "Belum ada riwayat transaksi"
-                }
             } catch (e: Exception) {
                 _toastMessage.value = "Gagal memuat history: ${e.message}"
             } finally {
