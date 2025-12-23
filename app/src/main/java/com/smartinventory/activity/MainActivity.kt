@@ -1,98 +1,81 @@
 package com.smartinventory.activity
 
-import android.os.Bundle
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.smartinventory.ui.theme.SmartInventoryTheme
 import android.content.Intent
+import android.os.Bundle
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
-import com.smartinventory.R
-import com.smartinventory.viewmodel.AuthViewModel
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.smartinventory.R
+import com.smartinventory.model.User
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var viewModel: AuthViewModel
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        viewModel = ViewModelProvider(this).get(AuthViewModel::class.java)
+        // 1. Inisialisasi View (Sesuaikan ID dengan XML Anda)
+        val tvStoreName = findViewById<TextView>(R.id.tvStoreName) // ID untuk "Nama Toko Anda"
+        val tvEmail = findViewById<TextView>(R.id.tvUserEmail)     // ID untuk "email@toko.com"
 
-        // 1. Cek User Login
-        if (viewModel.getCurrentUserUid() == null) {
-            goToLogin()
-            return
+        // Tombol-tombol Menu
+        val btnAdd = findViewById<CardView>(R.id.cardAdd)   // Asumsi pakai CardView
+        val btnStock = findViewById<CardView>(R.id.cardStock)
+        val btnCashier = findViewById<CardView>(R.id.cardCashier)
+        val btnReport = findViewById<CardView>(R.id.cardHistory)
+        val btnLogout = findViewById<CardView>(R.id.cardLogout)
+
+        // 2. Load Data User (Nama Toko & Email)
+        loadUserProfile(tvStoreName, tvEmail)
+
+        // 3. Navigasi Tombol (Sesuai Struktur Project Anda)
+        btnAdd.setOnClickListener {
+            startActivity(Intent(this, AddProductActivity::class.java))
         }
 
-        // 2. Inisialisasi Komponen UI
-        val tvNamaToko = findViewById<TextView>(R.id.tvNamaToko)
-        val tvUserEmail = findViewById<TextView>(R.id.tvUserEmail)
-
-        val cardAdd = findViewById<CardView>(R.id.cardAdd)
-        val cardList = findViewById<CardView>(R.id.cardList)
-        // Ubah variabel ini sesuai ID baru di XML
-        val cardCashier = findViewById<CardView>(R.id.cardCashier)
-        val cardHistory = findViewById<CardView>(R.id.cardHistory) // ID Baru
-        val cardLogout = findViewById<CardView>(R.id.cardLogout)
-
-        // --- 1. Tombol TAMBAH BARANG (Kembali ke fungsi asli) ---
-        cardAdd.setOnClickListener {
-            val intent = Intent(this, AddItemActivity::class.java)
-            startActivity(intent)
+        btnStock.setOnClickListener {
+            startActivity(Intent(this, ProductListActivity::class.java)) // Atau Activity Stok
         }
 
-        // --- 2. Tombol STOK BARANG ---
-        cardList.setOnClickListener {
-            val intent = Intent(this, ProductListActivity::class.java)
-            startActivity(intent)
+        btnCashier.setOnClickListener {
+            startActivity(Intent(this, CashierActivity::class.java))
         }
 
-        // --- 3. Tombol KASIR (Fungsi Baru) ---
-        cardCashier.setOnClickListener {
-            val intent = Intent(this, CashierActivity::class.java)
-            startActivity(intent)
+        btnReport.setOnClickListener {
+            startActivity(Intent(this, HistoryActivity::class.java))
         }
 
-        // --- 4. Tombol LOGOUT ---
-        cardLogout.setOnClickListener {
-            viewModel.logout()
-            Toast.makeText(this, "Berhasil Logout", Toast.LENGTH_SHORT).show()
-            goToLogin()
-        }
-        // --- 5. Tombol LAPORAN ---
-        cardHistory.setOnClickListener {
-            val intent = Intent(this, HistoryActivity::class.java)
-            startActivity(intent)
+        btnLogout.setOnClickListener {
+            auth.signOut()
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish() // Tutup Dashboard agar tidak bisa diback
         }
     }
 
-    private fun goToLogin() {
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-}
+    private fun loadUserProfile(tvName: TextView, tvEmail: TextView) {
+        val userId = auth.currentUser?.uid
+        if (userId == null) return
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+        // Ambil data dari collection 'users'
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    // Konversi ke object User (Pastikan Model User.kt sudah benar field-nya)
+                    val user = document.toObject(User::class.java)
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SmartInventoryTheme {
-        Greeting("Android")
+                    // Tampilkan ke Layar
+                    tvName.text = user?.storeName ?: "Nama Toko Tidak Ditemukan"
+                    tvEmail.text = user?.email ?: "Email Tidak Ditemukan"
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Gagal memuat profil", Toast.LENGTH_SHORT).show()
+            }
     }
 }
