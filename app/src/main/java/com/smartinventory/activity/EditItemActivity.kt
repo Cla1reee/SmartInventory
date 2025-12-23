@@ -40,10 +40,10 @@ class EditItemActivity : AppCompatActivity() {
         val etSupplier = findViewById<EditText>(R.id.etEditSupplier)
 
         // Isi text-nya
-        etNama.setText(currentProduct.namaBarang)
+        etNama.setText(currentProduct.productName)
         // Ubah angka ke text agar bisa diedit
-        etHarga.setText(currentProduct.harga.toInt().toString()) // .toInt() biar .0 nya hilang
-        etStok.setText(currentProduct.stok.toString())
+        etHarga.setText(currentProduct.price.toInt().toString()) // .toInt() biar .0 nya hilang
+        etStok.setText(currentProduct.stock.toString())
         etSupplier.setText(currentProduct.supplier)
 
         // 3. TOMBOL UPDATE
@@ -54,11 +54,17 @@ class EditItemActivity : AppCompatActivity() {
             val stokBaru = etStok.text.toString().toIntOrNull() ?: 0
             val supplierBaru = etSupplier.text.toString().trim()
 
+            // VALIDASI TAMBAHAN (Sesuai REQ-SAFE-002)
+            if (hargaBaru < 0 || stokBaru < 0) {
+                Toast.makeText(this, "Harga dan Stok tidak boleh negatif!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             // Siapkan bungkusan data yang mau diupdate
             val updates = mapOf(
-                "namaBarang" to namaBaru,
-                "harga" to hargaBaru,
-                "stok" to stokBaru,
+                "productName" to namaBaru,
+                "Price" to hargaBaru,
+                "stock" to stokBaru,
                 "supplier" to supplierBaru
             )
 
@@ -87,10 +93,11 @@ class EditItemActivity : AppCompatActivity() {
     private fun showDeleteConfirmation() {
         AlertDialog.Builder(this)
             .setTitle("Hapus Barang?")
-            .setMessage("Apakah Anda yakin ingin menghapus '${currentProduct.namaBarang}'? Data tidak bisa dikembalikan.")
+            .setMessage("Apakah Anda yakin ingin menghapus '${currentProduct.productName}'? Data tidak bisa dikembalikan.")
             .setPositiveButton("Hapus") { _, _ ->
                 // Panggil ViewModel Delete
                 viewModel.deleteProduct(currentProduct.productId)
+                finish()
             }
             .setNegativeButton("Batal", null)
             .show()
