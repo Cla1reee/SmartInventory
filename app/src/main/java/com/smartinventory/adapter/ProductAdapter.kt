@@ -7,15 +7,14 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.smartinventory.R
 import com.smartinventory.model.Product
-import java.text.NumberFormat
-import java.util.Locale
+import com.smartinventory.utils.toRupiah // Import Utility Anda
 
 class ProductAdapter(
     private var productList: List<Product> = listOf(),
-    private val onClick: (Product) -> Unit // Untuk persiapan fitur Edit/Hapus nanti
-    ) : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() {
+    // Callback ini akan dipanggil saat kasir mengklik barang untuk masuk keranjang
+    private val onClick: (Product) -> Unit
+) : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() {
 
-    // Class pemegang tampilan
     class ProductViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvName: TextView = view.findViewById(R.id.tvItemName)
         val tvPrice: TextView = view.findViewById(R.id.tvItemPrice)
@@ -31,14 +30,14 @@ class ProductAdapter(
     override fun onBindViewHolder(holder: ProductViewHolder, position: Int) {
         val product = productList[position]
 
-        holder.tvName.text = product.namaBarang
-        holder.tvStock.text = "Stok: ${product.stok}"
+        holder.tvName.text = product.productName
+        holder.tvStock.text = "Stok: ${product.stock}"
 
-        // Format Rupiah
-        val formatRupiah = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-        holder.tvPrice.text = formatRupiah.format(product.harga)
+        // PERBAIKAN: Gunakan Utils, jangan format manual lagi!
+        // Pastikan product.price tipe datanya Int/Long/Double sesuai model Anda
+        holder.tvPrice.text = product.price.toDouble().toRupiah()
 
-        // Klik Item
+        // Logika Klik: Kirim data produk ke Activity/ViewModel
         holder.itemView.setOnClickListener {
             onClick(product)
         }
@@ -46,7 +45,6 @@ class ProductAdapter(
 
     override fun getItemCount() = productList.size
 
-    // Fungsi untuk update data dari Activity
     fun updateData(newList: List<Product>) {
         productList = newList
         notifyDataSetChanged()
