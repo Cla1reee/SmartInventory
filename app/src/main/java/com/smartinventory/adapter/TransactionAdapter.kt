@@ -7,7 +7,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.smartinventory.R
 import com.smartinventory.model.Transaction
-import java.text.NumberFormat
+import com.smartinventory.utils.toRupiah // Gunakan Utility Anda
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -28,18 +28,29 @@ class TransactionAdapter(private var list: List<Transaction> = listOf())
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val item = list[position]
+        val transaction = list[position]
 
-        holder.tvName.text = item.namaBarang
-        holder.tvQty.text = "${item.jumlahBeli} pcs"
+        // PERBAIKAN 1: Menangani Nama Barang (Multi-Item)
+        // Karena 'items' adalah List, kita gabungkan namanya.
+        // Contoh Output: "Indomie Goreng, Teh Kotak, Kopi"
+        val gabunganNamaBarang = transaction.items.joinToString(", ") { it.productName }
+        holder.tvName.text = if (gabunganNamaBarang.isNotEmpty()) gabunganNamaBarang else "Item dihapus"
 
-        // Format Rupiah
-        val formatRupiah = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-        holder.tvTotal.text = formatRupiah.format(item.totalHarga)
+        // PERBAIKAN 2: Menghitung Total Qty
+        // Menjumlahkan qty dari semua item di dalam list
+        val totalQty = transaction.items.sumOf { it.qty }
+        holder.tvQty.text = "$totalQty items"
 
-        // Format Tanggal
+        // PERBAIKAN 3: Format Rupiah (Pakai Utils)
+        holder.tvTotal.text = transaction.totalAmount.toRupiah()
+
+        // PERBAIKAN 4: Format Tanggal
         val dateFormat = SimpleDateFormat("dd MMM HH:mm", Locale("id", "ID"))
-        holder.tvDate.text = dateFormat.format(item.tanggal)
+        if (transaction.transactionDate != null) {
+            holder.tvDate.text = dateFormat.format(transaction.transactionDate!!)
+        } else {
+            holder.tvDate.text = "Memproses..."
+        }
     }
 
     override fun getItemCount() = list.size
