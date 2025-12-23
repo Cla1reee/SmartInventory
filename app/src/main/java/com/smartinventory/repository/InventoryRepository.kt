@@ -1,87 +1,74 @@
 package com.smartinventory.repository
 
-import com.smartinventory.model.Product
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
+import com.smartinventory.model.Product
 import com.smartinventory.model.Transaction
-
 
 class InventoryRepository {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
-    private val PRODUCTS_COLLECTION = "products"
 
-    // TAMBAHKAN COLLECTION INI:
-    private val TRANSACTIONS_COLLECTION = "transactions"
-
-    // Asumsi: Setiap user punya produknya sendiri (untuk multi-user/multi-toko)
-    private val userId = auth.currentUser?.uid
+    // NAMA COLLECTION (Sesuai SRS)
+    private val PRODUCTS_COLLECTION = "products"       // [cite: 508]
+    private val TRANSACTIONS_COLLECTION = "transactions" // [cite: 524]
 
     // --- FUNGSI 1: CREATE (Tambah Barang Baru) ---
     fun addProduct(product: Product, onResult: (Boolean, String?) -> Unit) {
-        // 1. Ambil User ID (Barang ini milik toko siapa?)
         val currentUserId = auth.currentUser?.uid
         if (currentUserId == null) {
             onResult(false, "User tidak terdeteksi")
             return
         }
 
-        // 2. Set 'storeId' agar barang tidak tertukar dengan toko lain
-        product.storeId = currentUserId
+        // PERBAIKAN: Set userId sesuai SRS [cite: 517]
+        product.userId = currentUserId
 
-        // 3. Buat Dokumen Baru di Firebase (Generate ID Otomatis)
         val newDocRef = db.collection(PRODUCTS_COLLECTION).document()
 
-        // 4. Masukkan ID otomatis itu ke dalam objek Product (supaya tersimpan)
-        product.productId = newDocRef.id // Pastikan di Product.kt namanya 'productId'
+        // Simpan ID dokumen ke dalam field model agar konsisten
+        product.productId = newDocRef.id
 
-        // 5. Simpan ke Database
         newDocRef.set(product)
-            .addOnSuccessListener {
-                onResult(true, null) // Sukses
-            }
-            .addOnFailureListener { e ->
-                onResult(false, e.message) // Gagal
-            }
+            .addOnSuccessListener { onResult(true, null) }
+            .addOnFailureListener { e -> onResult(false, e.message) }
     }
 
-    // --- FUNGANGSI 2: READ (Ambil Daftar Barang + Search) ---
-    // Menggunakan suspend function untuk Coroutines
+    // --- FUNGSI 2: READ (Ambil Daftar Barang + Search) ---
     suspend fun getAllProducts(query: String? = null): List<Product> {
-        val currentUserId = auth.currentUser?.uid ?: return emptyList() // Cek login dulu
+        val currentUserId = auth.currentUser?.uid ?: return emptyList()
 
         return try {
-            // 1. Mulai dengan filter pemilik toko (Wajib)
+            // PERBAIKAN: Filter berdasarkan userId [cite: 542]
             var dbQuery = db.collection(PRODUCTS_COLLECTION)
-                .whereEqualTo("storeId", currentUserId)
-                .limit(100)
+                .whereEqualTo("userId", currentUserId)
 
-            // 2. Jika ada search, tambahkan filter nama
+            // Logika Search Sederhana
             if (!query.isNullOrBlank()) {
                 val endQuery = query + "\uf8ff"
                 dbQuery = dbQuery
-                    .whereGreaterThanOrEqualTo("namaBarang", query)
-                    .whereLessThanOrEqualTo("namaBarang", endQuery)
-                // Note: Firestore butuh Index "storeId + namaBarang" untuk ini
+                    .whereGreaterThanOrEqualTo("productName", query)
+                    .whereLessThanOrEqualTo("productName", endQuery)
             }
 
+            // Eksekusi Query
             val snapshot = dbQuery.get().await()
             snapshot.documents.mapNotNull { document ->
-                document.toObject(Product::class.java)?.apply {
-                    productId = document.id
-                }
+                // Konversi dokumen ke objek Product
+                // @DocumentId di model akan otomatis mengisi field productId
+                document.toObject(Product::class.java)
             }
         } catch (e: Exception) {
-            android.util.Log.e("RepoProduct", "Error: ${e.message}")
             emptyList()
         }
     }
 
-    // --- FUNGSI 3: UPDATE (Ubah Detail Barang) ---
-    fun updateProduct(productId: String, updates: Map<String, Any>, callback: (isSuccess: Boolean) -> Unit) {
+    // --- FUNGSI 3: UPDATE ---
+    fun updateProduct(productId: String, updates: Map<String, Any>, callback: (Boolean) -> Unit) {
         db.collection(PRODUCTS_COLLECTION)
             .document(productId)
             .update(updates)
@@ -89,8 +76,8 @@ class InventoryRepository {
             .addOnFailureListener { callback(false) }
     }
 
-    // --- FUNGSI 4: DELETE (Hapus Barang) ---
-    fun deleteProduct(productId: String, callback: (isSuccess: Boolean) -> Unit) {
+    // --- FUNGSI 4: DELETE ---
+    fun deleteProduct(productId: String, callback: (Boolean) -> Unit) {
         db.collection(PRODUCTS_COLLECTION)
             .document(productId)
             .delete()
@@ -98,53 +85,55 @@ class InventoryRepository {
             .addOnFailureListener { callback(false) }
     }
 
-    // --- FUNGSI 5: SIMPAN TRANSAKSI (KASIR) ---
+    // --- FUNGSI 5: SIMPAN TRANSAKSI (ATOMIC BATCH WRITE) ---
+    // PERBAIKAN TOTAL: Disesuaikan untuk Multi-Item sesuai SRS [cite: 326, 530]
     suspend fun createTransaction(transaction: Transaction): Boolean {
-        val productRef = db.collection(PRODUCTS_COLLECTION).document(transaction.productId)
+        val currentUserId = auth.currentUser?.uid ?: return false
+        transaction.userId = currentUserId
+
+        // 1. Siapkan Batch
+        val batch = db.batch()
+
+        // 2. Siapkan Referensi Dokumen Transaksi Baru
         val transactionRef = db.collection(TRANSACTIONS_COLLECTION).document()
+        transaction.transactionId = transactionRef.id // Set ID yang baru dibuat
 
+        // 3. Masukkan Operasi "Simpan Transaksi" ke Batch
+        batch.set(transactionRef, transaction)
+
+        // 4. Masukkan Operasi "Kurangi Stok" untuk SETIAP ITEM ke Batch
+        // Kita meloop list 'items' yang ada di dalam objek Transaction
+        for (item in transaction.items) {
+            val productRef = db.collection(PRODUCTS_COLLECTION).document(item.productId)
+
+            // Kurangi stok (Atomic Increment negatif)
+            // Sesuai SRS: Update product stock levels [cite: 328]
+            batch.update(productRef, "stock", FieldValue.increment(-item.qty.toLong()))
+        }
+
+        // 5. Eksekusi Semua (Commit)
         return try {
-            db.runTransaction { transactionDb ->
-                val snapshot = transactionDb.get(productRef)
-                val stokSaatIni = snapshot.getLong("stok") ?: 0
-
-                if (stokSaatIni < transaction.jumlahBeli) {
-                    throw Exception("Stok Habis") // Ini akan melempar ke catch
-                }
-
-                val stokBaru = stokSaatIni - transaction.jumlahBeli
-                transactionDb.update(productRef, "stok", stokBaru)
-
-                transaction.id = transactionRef.id
-                transactionDb.set(transactionRef, transaction)
-            }.await() // await() mengubah callback menjadi synchronous
-
-            true // Jika sampai sini berarti sukses
+            batch.commit().await()
+            true
         } catch (e: Exception) {
-            android.util.Log.e("Transaksi", "Gagal: ${e.message}")
-            false // Jika error
+            false
         }
     }
+
     // --- FUNGSI 6: AMBIL RIWAYAT TRANSAKSI ---
     suspend fun getAllTransactions(): List<Transaction> {
         return try {
-            val currentUserId = auth.currentUser?.uid
+            val currentUserId = auth.currentUser?.uid ?: return emptyList()
 
-            // Ambil data dari collection 'transactions'
-            // Diurutkan berdasarkan tanggal (Terbaru di atas)
-            val snapshot = db.collection(TRANSACTIONS_COLLECTION)
-                .whereEqualTo("storeId", currentUserId)
-                .orderBy("tanggal", Query.Direction.DESCENDING)
+            db.collection(TRANSACTIONS_COLLECTION)
+                .whereEqualTo("userId", currentUserId) // Filter Data Isolation [cite: 356]
+                .orderBy("transactionDate", Query.Direction.DESCENDING) // Urutkan terbaru [cite: 358]
                 .get()
                 .await()
-
-            snapshot.documents.mapNotNull { doc ->
-                doc.toObject(Transaction::class.java)?.apply {
-                    id = doc.id
+                .documents.mapNotNull { doc ->
+                    doc.toObject(Transaction::class.java)
                 }
-            }
         } catch (e: Exception) {
-            android.util.Log.e("RepoHistory", "Gagal ambil history: ${e.message}")
             emptyList()
         }
     }
