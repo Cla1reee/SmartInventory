@@ -2,8 +2,10 @@ package com.smartinventory.activity
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import com.google.firebase.auth.FirebaseAuth
@@ -13,6 +15,7 @@ import com.smartinventory.model.User
 
 class MainActivity : AppCompatActivity() {
 
+    // Inisialisasi Firebase
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
 
@@ -20,62 +23,86 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Inisialisasi View (Sesuaikan ID dengan XML Anda)
-        val tvStoreName = findViewById<TextView>(R.id.tvStoreName) // ID untuk "Nama Toko Anda"
-        val tvEmail = findViewById<TextView>(R.id.tvUserEmail)     // ID untuk "email@toko.com"
+        // 1. Setup UI Components
+        setupViews()
+    }
 
-        // Tombol-tombol Menu
-        val btnAdd = findViewById<CardView>(R.id.cardAdd)   // Asumsi pakai CardView
-        val btnStock = findViewById<CardView>(R.id.cardStock)
-        val btnCashier = findViewById<CardView>(R.id.cardCashier)
-        val btnReport = findViewById<CardView>(R.id.cardHistory)
-        val btnLogout = findViewById<CardView>(R.id.cardLogout)
+    private fun setupViews() {
+        // --- Referensi ID dari Layout XML Baru ---
+        val tvShopName = findViewById<TextView>(R.id.tvShopName)
 
-        // 2. Load Data User (Nama Toko & Email)
-        loadUserProfile(tvStoreName, tvEmail)
+        val cardAddItem = findViewById<CardView>(R.id.cardAddItem)
+        val cardStock = findViewById<CardView>(R.id.cardStock)
+        val cardCashier = findViewById<CardView>(R.id.cardCashier)
+        val cardReport = findViewById<CardView>(R.id.cardReport)
 
-        // 3. Navigasi Tombol (Sesuai Struktur Project Anda)
-        btnAdd.setOnClickListener {
+        val btnLogout = findViewById<LinearLayout>(R.id.btnLogout)
+
+        // --- Load Data User (Nama Toko) ---
+        loadUserProfile(tvShopName)
+
+        // --- Event Listeners (Navigasi) ---
+
+        // 1. Menu Tambah Barang
+        cardAddItem.setOnClickListener {
+            // Pastikan nama Activity ini sesuai dengan file Kotlin Anda
             startActivity(Intent(this, AddProductActivity::class.java))
         }
 
-        btnStock.setOnClickListener {
-            startActivity(Intent(this, ProductListActivity::class.java)) // Atau Activity Stok
+        // 2. Menu Stok Barang
+        cardStock.setOnClickListener {
+            startActivity(Intent(this, ProductListActivity::class.java))
         }
 
-        btnCashier.setOnClickListener {
+        // 3. Menu Kasir
+        cardCashier.setOnClickListener {
             startActivity(Intent(this, CashierActivity::class.java))
         }
 
-        btnReport.setOnClickListener {
+        // 4. Menu Laporan / Riwayat
+        cardReport.setOnClickListener {
             startActivity(Intent(this, HistoryActivity::class.java))
         }
 
+        // 5. Tombol Keluar
         btnLogout.setOnClickListener {
-            auth.signOut()
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish() // Tutup Dashboard agar tidak bisa diback
+            showLogoutConfirmDialog()
         }
     }
 
-    private fun loadUserProfile(tvName: TextView, tvEmail: TextView) {
-        val userId = auth.currentUser?.uid
-        if (userId == null) return
+    private fun loadUserProfile(tvName: TextView) {
+        val userId = auth.currentUser?.uid ?: return
 
-        // Ambil data dari collection 'users'
         db.collection("users").document(userId).get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
-                    // Konversi ke object User (Pastikan Model User.kt sudah benar field-nya)
                     val user = document.toObject(User::class.java)
-
-                    // Tampilkan ke Layar
-                    tvName.text = user?.storeName ?: "Nama Toko Tidak Ditemukan"
-                    tvEmail.text = user?.email ?: "Email Tidak Ditemukan"
+                    tvName.text = user?.storeName ?: "Toko Kopi"
                 }
             }
             .addOnFailureListener {
-                Toast.makeText(this, "Gagal memuat profil", Toast.LENGTH_SHORT).show()
+                // Silent error atau log jika perlu
+                tvName.text = "Offline Mode"
             }
+    }
+
+    private fun showLogoutConfirmDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Konfirmasi")
+            .setMessage(getString(R.string.msg_logout_confirm)) // Pastikan string ini ada di strings.xml
+            .setPositiveButton("Ya") { _, _ ->
+                performLogout()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun performLogout() {
+        auth.signOut()
+        val intent = Intent(this, LoginActivity::class.java)
+        // Hapus back stack agar user tidak bisa kembali ke Dashboard setelah logout
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 }
