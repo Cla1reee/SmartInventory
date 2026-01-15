@@ -1,3 +1,34 @@
 <resources>
-    <string name="app_name">SmartInventory</string>
+    <string name="app_name">Smart Inventory</string>
+
+    <string name="login_app_title">Smart Inventory</string>
+    <string name="login_subtitle">Silakan login untuk masuk</string>
+    <string name="hint_email">Email</string>
+    <string name="hint_password">Password</string>
+    <string name="btn_login_text">LOGIN</string>
+    <string name="link_forgot_pass">Lupa Password?</string>
+    <string name="link_register">Belum punya akun? Daftar</string>
+
+    // Registration Strings
+    <string name="title_register">Buat Akun Baru</string>
+    <string name="hint_store_name">Nama Toko</string>
+    <string name="btn_register_text">Daftar Sekarang</string>
+    <string name="link_login">Sudah punya akun? Login di sini</string>
+
+    // Cashier Strings
+    <string name="title_kasir">Kasir SmartInventory</string>
+    <string name="label_pilih_barang">Pilih Barang</string>
+    <string name="label_keranjang">Keranjang Belanja</string>
+    <string name="label_total_transaksi">Total Transaksi</string>
+    <string name="text_rp_0">Rp 0</string>
+    <string name="btn_checkout">Konfirmasi Bayar</string>
+
+    // Dashboard Strings
+    <string name="label_selamat_datang">Selamat Datang,</string>
+    <string name="menu_tambah_barang">Tambah Barang</string>
+    <string name="menu_stok">Stok Barang</string>
+    <string name="menu_kasir">Kasir</string>
+    <string name="menu_laporan">Laporan</string>
+    <string name="btn_keluar">Keluar Aplikasi</string>
+    <string name="msg_logout_confirm">Yakin ingin keluar?</string>
 </resources>
