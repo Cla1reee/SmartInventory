@@ -1,14 +1,15 @@
 package com.smartinventory.activity
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView // Pastikan Import ini benar
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import android.content.Intent
 import com.smartinventory.R
 import com.smartinventory.adapter.ProductAdapter
 import com.smartinventory.viewmodel.InventoryViewModel
@@ -22,51 +23,77 @@ class ProductListActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_product_list)
 
-        // 1. Setup RecyclerView
-        val rvProductList = findViewById<RecyclerView>(R.id.rvProductList)
-        rvProductList.layoutManager = LinearLayoutManager(this)
-
-        adapter = ProductAdapter { product ->
-            // Saat item diklik, buka EditItemActivity
-            val intent = Intent(this, EditItemActivity::class.java)
-
-            // "Titip" data barang ke dalam intent (ini bisa berkat @Parcelize tadi)
-            intent.putExtra("EXTRA_PRODUCT", product)
-
-            startActivity(intent)
-        }
-        rvProductList.adapter = adapter
-
-        // 2. Setup ViewModel
+        // 1. Setup ViewModel
         viewModel = ViewModelProvider(this).get(InventoryViewModel::class.java)
+
+        // 2. Setup RecyclerView
+        val rvProductList = findViewById<RecyclerView>(R.id.rvProductList)
         val progressBar = findViewById<ProgressBar>(R.id.progressBar)
 
-        // 3. Observer Data Barang
+        // Setup Adapter
+        adapter = ProductAdapter { product ->
+            // Klik item -> Edit/Hapus
+            val intent = Intent(this, EditItemActivity::class.java)
+            intent.putExtra("EXTRA_PRODUCT", product)
+            startActivity(intent)
+        }
+
+        rvProductList.layoutManager = LinearLayoutManager(this)
+        rvProductList.adapter = adapter
+
+        // 3. Setup SEARCH VIEW (Perbaikan REQ-SRCH-001)
+        // Menghubungkan XML (svBarang) dengan Logika
+        val svBarang = findViewById<SearchView>(R.id.svBarang)
+
+        svBarang.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                // Panggil saat user tekan enter keyboard
+                viewModel.loadProducts(query)
+                svBarang.clearFocus() // Sembunyikan keyboard
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                // Panggil SETIAP HURUF diketik (Realtime)
+                viewModel.loadProducts(newText)
+                return true
+            }
+        })
+
+        // 4. Observer Data Barang
         viewModel.productList.observe(this) { products ->
             adapter.updateData(products)
 
+            // Logika UI kosong/isi
             if (products.isEmpty()) {
-                Toast.makeText(this, "Belum ada barang", Toast.LENGTH_SHORT).show()
+                // Opsional: Bisa tampilkan text "Data tidak ditemukan" jika mau
+                // Toast.makeText(this, "Tidak ada data", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // 4. Observer Loading
+        // 5. Observer Loading
         viewModel.isLoading.observe(this) { isLoading ->
             progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
         }
 
-        // 5. Observer Error Message
+        // 6. Observer Error Message
         viewModel.toastMessage.observe(this) { msg ->
-            if (msg != null) Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            if (msg != null) {
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                viewModel.clearToastMessage() // Bersihkan agar tidak muncul terus
+            }
         }
 
-        // 6. Panggil Data dari Firebase
+        // Load awal (Tanpa query)
         viewModel.loadProducts()
     }
 
-    // Agar saat kembali ke sini data ter-refresh (misal habis tambah barang)
     override fun onResume() {
         super.onResume()
-        viewModel.loadProducts()
+        // Refresh data saat kembali dari EditActivity
+        // Ambil query yang sedang ada di searchview (jika ada) agar filter tidak hilang
+        val svBarang = findViewById<SearchView>(R.id.svBarang)
+        val currentQuery = svBarang.query.toString()
+        viewModel.loadProducts(if (currentQuery.isNotEmpty()) currentQuery else null)
     }
 }
