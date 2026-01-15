@@ -116,6 +116,7 @@ class CashierActivity : AppCompatActivity() {
         btnCheckout.setOnClickListener {
             // Panggil fungsi checkout sakti (Batch Write)
             cashierViewModel.processCheckout()
+            finish()
         }
     }
 }
