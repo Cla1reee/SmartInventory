@@ -8,3 +8,5 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index']);
+Route::get('/dashboard/tambah', [DashboardController::class, 'create']);
+Route::post('/dashboard/simpan', [DashboardController::class, 'store']);
