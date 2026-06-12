@@ -12,17 +12,25 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('tb_transaksi', function (Blueprint $table) {
-        $table->id('id_transaksi');
-        $table->string('id_barang', 10);
-        $table->enum('jenis_transaksi', ['MASUK', 'KELUAR']);
-        $table->integer('jumlah');
-        $table->dateTime('waktu_scan');
-        $table->boolean('status_sync')->default(true); // True artinya sudah masuk server
-        $table->timestamps();
-
-        // Foreign Key Constraint
-        $table->foreign('id_barang')->references('id_barang')->on('tb_barang')->onDelete('cascade');
-    });
+            $table->id('id_transaksi'); // Primary Key
+            
+            // Foreign Key ke tb_barang
+            $table->string('id_barang');
+            $table->foreign('id_barang')->references('id_barang')->on('tb_barang')->onDelete('cascade');
+            
+            // Foreign Key ke users (Petugas yang login)
+            $table->unsignedBigInteger('id_user');
+            $table->foreign('id_user')->references('id')->on('users')->onDelete('cascade');
+            
+            $table->enum('jenis_transaksi', ['MASUK', 'KELUAR']);
+            $table->integer('jumlah');
+            $table->dateTime('waktu_scan');
+            
+            // Penanda sinkronisasi (True = berhasil masuk ke server)
+            $table->boolean('status_sync')->default(true);
+            
+            $table->timestamps();
+        });
     }
 
     /**

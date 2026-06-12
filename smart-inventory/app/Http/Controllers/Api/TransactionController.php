@@ -40,6 +40,7 @@ class TransactionController extends Controller
             // 5. Catat log ke tb_transaksi dengan status_sync = true (karena sudah online)
             DB::table('tb_transaksi')->insert([
                 'id_barang' => $request->id_barang,
+                'id_user' => auth()->guard('api')->user()->id,
                 'jenis_transaksi' => $request->jenis_transaksi,
                 'jumlah' => $request->jumlah,
                 'waktu_scan' => Carbon::parse($request->waktu_scan),
